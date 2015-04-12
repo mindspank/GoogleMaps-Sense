@@ -1,0 +1,8 @@
+{
+	"name" : "Google Maps",
+	"description" : "Allows you to plot geo data using Google Maps.",
+	"type" : "visualization",
+	"version": "1.0",
+  	"icon": "map",
+	"author": "Alexander Karlsson - Developer Relations - akl@qlik.com"
+}
