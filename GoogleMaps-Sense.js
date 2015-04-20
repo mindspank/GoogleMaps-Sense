@@ -15,7 +15,7 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
 
 	//Size of the data page to fetch
-	var pageChunk = 1000;
+	var pageChunk = 3000;
 
 	return {
 		initialProperties: {
@@ -23,7 +23,7 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google
 			qHyperCubeDef: {
 				qInitialDataFetch: [{
 					qWidth: 3,
-					qHeight: pageChunk
+					qHeight: 1500
 				}],
 				qSuppressZero: true,
 				qSuppressMissing: true
@@ -47,6 +47,25 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google
 			canTakeSnapshot: true
 		},
 		paint: function($element, layout) {
+
+			//Page through all available data
+			//Need to have all data before we can put markers onto the map
+			if (this.backendApi.getRowCount() > pageChunk + 1) {
+				var page = [{
+					qTop: pageChunk + 1,
+					qLeft: 0,
+					qWidth: 3,
+					qHeight: pageChunk
+				}];
+
+				//Get next page of data and re-render
+				this.backendApi.getData(page).then(function(d) {
+					pageChunk += pageChunk;
+					_this.paint($element, layout);
+				});
+
+			}
+
 			var markers = [];
 			var selectedMarkers = [];
 			var _this = this;
@@ -75,27 +94,10 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google
 			//Put the map on the page so give some visual feedback
 			var map = new google.maps.Map($element.get(0), mapOptions);
 
-			//Page through all available data
-			//Need to have all data before we can put markers onto the map
-			if (this.backendApi.getRowCount() > pageChunk + 1) {
-				var page = [{
-					qTop: pageChunk + 1,
-					qLeft: 0,
-					qWidth: 3,
-					qHeight: pageChunk
-				}];
-
-				//Get next page of data and re-render
-				this.backendApi.getData(page).then(function(d) {
-					pageChunk += pageChunk;
-					_this.paint($element, layout);
-				});
-
-			}
 
 			//Create a marker for each row of data
 			this.backendApi.eachDataRow(function(rownum, row) {
-
+				if(row[0].qText == '-') return;
 				//Parse the dimension
 				var latlng = JSON.parse(row[0].qText);
 
@@ -207,7 +209,6 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google
 				} else {
 					selectedMarkers.push(qElem)
 				}
-				console.log(selectedMarkers)
 				markers.forEach(function(marker) {
 					if (selectedMarkers.indexOf(marker.qElem) === -1) {
 						marker.setOpacity(0.5)
