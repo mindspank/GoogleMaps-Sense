@@ -10,7 +10,7 @@ require.config({
 	}
 });
 
-define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, MarkerClusterer) {
+define(['qlik', './src/properties', 'markerclusterer', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, MarkerClusterer) {
 
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
 
@@ -25,6 +25,7 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!http://maps.google
 					qWidth: 3,
 					qHeight: 1500
 				}],
+				qInterColumnSortOrder: [],
 				qSuppressZero: true,
 				qSuppressMissing: true
 			},
