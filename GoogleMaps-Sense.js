@@ -10,8 +10,7 @@ require.config({
 	}
 });
 
-define(['qlik', './src/properties', 'markerclusterer', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, MarkerClusterer) {
-
+define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, styles, MarkerClusterer) {
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
 
 	//Size of the data page to fetch
@@ -48,6 +47,8 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!https://maps.googl
 			canTakeSnapshot: true
 		},
 		paint: function($element, layout) {
+
+			var useCustomStyle = layout.gmaps.map.style !== 'default';
 
 			//Page through all available data
 			//Need to have all data before we can put markers onto the map
@@ -95,10 +96,24 @@ define(['qlik', './src/properties', 'markerclusterer', 'async!https://maps.googl
 			//Put the map on the page so give some visual feedback
 			var map = new google.maps.Map($element.get(0), mapOptions);
 
+			if(useCustomStyle) {
+
+				var selectedStyle = styles.filter(function(d) {
+					return d.key === layout.gmaps.map.style
+				});
+
+				var styledMap = new google.maps.StyledMapType(selectedStyle[0].data, {
+					name: layout.gmaps.map.style
+				});
+
+				map.mapTypes.set('map_style', styledMap);
+				map.setMapTypeId('map_style');
+
+			};
 
 			//Create a marker for each row of data
 			this.backendApi.eachDataRow(function(rownum, row) {
-				if(row[0].qText == '-') return;
+				if (row[0].qText == '-') return;
 				//Parse the dimension
 				var latlng = JSON.parse(row[0].qText);
 

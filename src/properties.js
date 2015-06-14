@@ -34,6 +34,12 @@ define([], function() {
 				options: [{
 					value: 'default',
 					label: 'Default'
+				}, {
+					value: 'greyscale',
+					label: 'Greyscale'
+				}, {
+					value: "cleangrey",
+					label: "Clean Grey"
 				}],
 				defaultValue: "default"
 			},
