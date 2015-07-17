@@ -14,7 +14,7 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
 
 	//Size of the data page to fetch
-	var pageChunk = 3000;
+	var pageBase = 3333;
 
 	return {
 		initialProperties: {
@@ -22,7 +22,7 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 			qHyperCubeDef: {
 				qInitialDataFetch: [{
 					qWidth: 3,
-					qHeight: 1500
+					qHeight: pageBase
 				}],
 				qInterColumnSortOrder: [],
 				qSuppressZero: true,
@@ -49,173 +49,181 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 		paint: function($element, layout) {
 
 			var useCustomStyle = layout.gmaps.map.style !== 'default';
-
-			//Page through all available data
-			//Need to have all data before we can put markers onto the map
-			if (this.backendApi.getRowCount() > pageChunk + 1) {
-				var page = [{
-					qTop: pageChunk + 1,
-					qLeft: 0,
-					qWidth: 3,
-					qHeight: pageChunk
-				}];
-
-				//Get next page of data and re-render
-				this.backendApi.getData(page).then(function(d) {
-					pageChunk += pageChunk;
-					_this.paint($element, layout);
-				});
-
-			}
-
+			var _this = this;				
 			var markers = [];
 			var selectedMarkers = [];
-			var _this = this;
-
-			var hasMeasure = layout.qHyperCube.qMeasureInfo.length >= 1 ? true : false;
-			var hasPopup = layout.qHyperCube.qMeasureInfo.length === 2 ? true : false;
-
-			//The bounds object, used to determain which part of the map to show based on data
-			var bounds = new google.maps.LatLngBounds();
-
-			var mapOptions = {
-				maxZoom: layout.gmaps.map.maxZoom,
-				panControl: true,
-				zoomControl: true,
-				overviewMapControl: false,
-				overviewMapControlOptions: {
-					opened: false
-				},
-				scaleControl: false,
-				streetViewControl: true,
-				mapTypeControlOptions: {
-					mapTypeIds: [google.maps.MapTypeId.ROADMAP, 'map_style']
-				}
+			
+			var pages = layout.qHyperCube.qDataPages;
+			var matrix = layout.qHyperCube.qDataPages[pages.length - 1];
+			var maxSize = layout.qHyperCube.qSize.qcy;
+			
+			console.log(pages) ;
+			
+			//Page through all available data
+			//Need to have all data before we can put markers onto the map
+			if ((matrix.qArea.qHeight + matrix.qArea.qTop) == maxSize) {
+				render();
+			} else {
+				var page = [{
+					qTop: (matrix.qArea.qHeight + matrix.qArea.qTop) + 1,
+					qLeft: 0,
+					qWidth: 3,
+					qHeight: 3333
+				}];
+				
+				
+				//Get next page of data and re-render
+				this.backendApi.getData(page).then(function(d) {
+					_this.paint($element, layout);
+				});				
 			};
 
-			//Put the map on the page so give some visual feedback
-			var map = new google.maps.Map($element.get(0), mapOptions);
+			function render() {
 
-			if(useCustomStyle) {
-
-				var selectedStyle = styles.filter(function(d) {
-					return d.key === layout.gmaps.map.style
-				});
-
-				var styledMap = new google.maps.StyledMapType(selectedStyle[0].data, {
-					name: layout.gmaps.map.style
-				});
-
-				map.mapTypes.set('map_style', styledMap);
-				map.setMapTypeId('map_style');
-
-			};
-
-			//Create a marker for each row of data
-			this.backendApi.eachDataRow(function(rownum, row) {
-				if (row[0].qText == '-') return;
-				//Parse the dimension
-				var latlng = JSON.parse(row[0].qText);
-
-				//Reverse the order as QS sends long lat
-				var point = new google.maps.LatLng(latlng[1], latlng[0]);
-
-				//Create our marker - if we have a expression then use that otherwise default to just show locations
-				var marker = new google.maps.Marker({
-					position: point,
-					title: '',
-					customData: hasMeasure ? row[1].qText : 1,
-					qElem: row[0].qElemNumber
-				});
-
-				//If we have popup values for each marker create the popup windows
-				if (hasPopup) {
-
-					marker.infoWindow = new google.maps.InfoWindow({
-						content: row[2].qText
-					});
-
-					google.maps.event.addListener(marker, 'mouseover', function() {
-						this.infoWindow.open(map, this);
-					});
-
-					google.maps.event.addListener(marker, 'mouseout', function() {
-						this.infoWindow.close();
-					});
-
-				};
-
-				//Add click handler
-				//TODO: Give some sort of visual indication that a point is in selected state
-				google.maps.event.addListener(marker, 'click', (function(value) {
-					return function() {
-						_this.selectValues(0, [value], true);
-						highlightMarkers(value)
+				var hasMeasure = layout.qHyperCube.qMeasureInfo.length >= 1 ? true : false;
+				var hasPopup = layout.qHyperCube.qMeasureInfo.length === 2 ? true : false;
+	
+				//The bounds object, used to determain which part of the map to show based on data
+				var bounds = new google.maps.LatLngBounds();
+	
+				var mapOptions = {
+					maxZoom: layout.gmaps.map.maxZoom,
+					panControl: true,
+					zoomControl: true,
+					overviewMapControl: false,
+					overviewMapControlOptions: {
+						opened: false
+					},
+					scaleControl: false,
+					streetViewControl: true,
+					mapTypeControlOptions: {
+						mapTypeIds: [google.maps.MapTypeId.ROADMAP, 'map_style']
 					}
-				})(row[0].qElemNumber));
-
-				bounds.extend(point);
-				markers.push(marker);
-
-			});
-
-
-			//Fit map to bounds
-			map.fitBounds(bounds);
-
-			//Clustering enabled
-			if (layout.gmaps.map.mode === 'cluster') {
-
-				if (layout.gmaps.cluster.oneStyle) {
-					var clusterStyles = [{
-						opt_textColor: 'black',
-						url: BASE_URL + 'images/singlecluster.png',
-						height: 56,
-						width: 55
-					}];
 				};
-
-				var mcOptions = {
-					imagePath: BASE_URL + 'images/m',
-					styles: clusterStyles,
-					maxZoom: layout.gmaps.cluster.maxZoom
+	
+				//Put the map on the page so give some visual feedback
+				var map = new google.maps.Map($element.get(0), mapOptions);
+	
+				if(useCustomStyle) {
+	
+					var selectedStyle = styles.filter(function(d) {
+						return d.key === layout.gmaps.map.style
+					});
+	
+					var styledMap = new google.maps.StyledMapType(selectedStyle[0].data, {
+						name: layout.gmaps.map.style
+					});
+	
+					map.mapTypes.set('map_style', styledMap);
+					map.setMapTypeId('map_style');
+	
 				};
-
-				//Draw clusters onto map
-				var markerCluster = new MarkerClusterer(map, markers, mcOptions);
-				markerCluster.setCalculator(function(markers, clusterStyles) {
-
-					var index = 0,
-						count = markers.length,
-						total = count;
-
-					while (total !== 0) {
-						//Create a new total by dividing by a set number
-						total = parseInt(total / 5, 10);
-						//Increase the index and move up to the next style
-						index++;
-					}
-					index = Math.min(index, clusterStyles);
-
-					var measure = 0;
-					for (var i = 0, k = count; i < k; i++) {
-						measure += parseInt(markers[i].customData)
-					}
-					var abbreviatedValue = abbreviateNumber(measure)
-					return {
-						text: abbreviatedValue,
-						index: index
+		
+				//Create a marker for each row of data
+				_this.backendApi.eachDataRow(function(rownum, row) {
+					if (row[0].qText == '-') return;
+					//Parse the dimension
+					var latlng = JSON.parse(row[0].qText);
+	
+					//Reverse the order as QS sends long lat
+					var point = new google.maps.LatLng(latlng[1], latlng[0]);
+	
+					//Create our marker - if we have a expression then use that otherwise default to just show locations
+					var marker = new google.maps.Marker({
+						position: point,
+						title: '',
+						customData: hasMeasure ? row[1].qText : 1,
+						qElem: row[0].qElemNumber
+					});
+	
+					//If we have popup values for each marker create the popup windows
+					if (hasPopup) {
+	
+						marker.infoWindow = new google.maps.InfoWindow({
+							content: row[2].qText
+						});
+	
+						google.maps.event.addListener(marker, 'mouseover', function() {
+							this.infoWindow.open(map, this);
+						});
+	
+						google.maps.event.addListener(marker, 'mouseout', function() {
+							this.infoWindow.close();
+						});
+	
 					};
+	
+					//Add click handler
+					//TODO: Give some sort of visual indication that a point is in selected state
+					google.maps.event.addListener(marker, 'click', (function(value) {
+						return function() {
+							_this.selectValues(0, [value], true);
+							highlightMarkers(value)
+						}
+					})(row[0].qElemNumber));
+	
+					bounds.extend(point);
+					markers.push(marker);
+	
 				});
-
+	
+	
+				//Fit map to bounds
+				map.fitBounds(bounds);
+	
+				//Clustering enabled
+				if (layout.gmaps.map.mode === 'cluster') {
+	
+					if (layout.gmaps.cluster.oneStyle) {
+						var clusterStyles = [{
+							opt_textColor: 'black',
+							url: BASE_URL + 'images/singlecluster.png',
+							height: 56,
+							width: 55
+						}];
+					};
+	
+					var mcOptions = {
+						imagePath: BASE_URL + 'images/m',
+						styles: clusterStyles,
+						maxZoom: layout.gmaps.cluster.maxZoom
+					};
+	
+					//Draw clusters onto map
+					var markerCluster = new MarkerClusterer(map, markers, mcOptions);
+					markerCluster.setCalculator(function(markers, clusterStyles) {
+	
+						var index = 0,
+							count = markers.length,
+							total = count;
+	
+						while (total !== 0) {
+							//Create a new total by dividing by a set number
+							total = parseInt(total / 5, 10);
+							//Increase the index and move up to the next style
+							index++;
+						}
+						index = Math.min(index, clusterStyles);
+	
+						var measure = 0;
+						for (var i = 0, k = count; i < k; i++) {
+							measure += parseInt(markers[i].customData)
+						}
+						var abbreviatedValue = abbreviateNumber(measure)
+						return {
+							text: abbreviatedValue,
+							index: index
+						};
+					});
+	
+				};
+	
+				if (layout.gmaps.map.mode === 'marker') {
+					markers.forEach(function(d) {
+						d.setMap(map);
+					})
+				};				
 			};
-
-			if (layout.gmaps.map.mode === 'marker') {
-				markers.forEach(function(d) {
-					d.setMap(map);
-				})
-			};
-
 
 			//In selection mode - loop over markers to highlight markers scheduled for selection.
 			function highlightMarkers(qElem) {
