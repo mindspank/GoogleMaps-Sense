@@ -40,6 +40,8 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 		},
 		paint: function($element, layout) {
 			
+			$element.empty();
+			
 			this.backendApi.cacheCube.enabled = false;
 			var _this = this;
 			
@@ -58,7 +60,7 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 			
 			var Promise = qv.getService('$q');
 			
-			var promises = [1,2,3,4].map(function(data, index) {
+			var promises = Array.apply(null, Array(numberOfPages)).map(function(data, index) {
 				var page = {
 					qTop: (pageheight * index) + index,
 					qLeft: 0,
@@ -71,12 +73,11 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 			}, this)
 			
 			Promise.all(promises).then(function(data) {
+				console.log(data)
 				render(data);
 			});
 			
 			function render(data) {
-
-				$element.empty();
 
 				var useCustomStyle = layout.gmaps.map.style !== 'default';
 				var hasMeasure = layout.qHyperCube.qMeasureInfo.length >= 1 ? true : false;
