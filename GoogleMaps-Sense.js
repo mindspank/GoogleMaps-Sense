@@ -10,21 +10,13 @@ require.config({
 	}
 });
 
-define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, styles, MarkerClusterer) {
+define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/abbreviateNumber', 'qvangular', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, styles, MarkerClusterer, abbreviateNumber, qv) {
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
-
-	//Size of the data page to fetch
-	var pageBase = 3333;
 
 	return {
 		initialProperties: {
-			version: 1.1,
+			version: 1,
 			qHyperCubeDef: {
-				qInitialDataFetch: [{
-					qWidth: 3,
-					qHeight: pageBase
-				}],
-				qInterColumnSortOrder: [],
 				qSuppressZero: true,
 				qSuppressMissing: true
 			},
@@ -47,39 +39,46 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 			canTakeSnapshot: true
 		},
 		paint: function($element, layout) {
+			
+			this.backendApi.cacheCube.enabled = false;
+			var _this = this;
+			
+			var columns = layout.qHyperCube.qSize.qcx, totalheight = layout.qHyperCube.qSize.qcy;
+		    var pageheight = Math.floor(10000 / columns);
+			var numberOfPages = Math.ceil(totalheight / pageheight);
 
-			var useCustomStyle = layout.gmaps.map.style !== 'default';
-			var _this = this;				
 			var markers = [];
 			var selectedMarkers = [];
+																		
+			var columns = layout.qHyperCube.qSize.qcx;
+			var totalheight = layout.qHyperCube.qSize.qcy;
 			
-			var pages = layout.qHyperCube.qDataPages;
-			var matrix = layout.qHyperCube.qDataPages[pages.length - 1];
-			var maxSize = layout.qHyperCube.qSize.qcy;
+			var pageheight = Math.floor(10000 / columns);
+			var numberOfPages = Math.ceil(totalheight / pageheight);
 			
-			console.log(pages) ;
+			var Promise = qv.getService('$q');
 			
-			//Page through all available data
-			//Need to have all data before we can put markers onto the map
-			if ((matrix.qArea.qHeight + matrix.qArea.qTop) == maxSize) {
-				render();
-			} else {
-				var page = [{
-					qTop: (matrix.qArea.qHeight + matrix.qArea.qTop) + 1,
+			var promises = [1,2,3,4].map(function(data, index) {
+				var page = {
+					qTop: (pageheight * index) + index,
 					qLeft: 0,
-					qWidth: 3,
-					qHeight: 3333
-				}];
+					qWidth: columns,
+					qHeight: pageheight
+				};
 				
+				return this.backendApi.getData([page]);
 				
-				//Get next page of data and re-render
-				this.backendApi.getData(page).then(function(d) {
-					_this.paint($element, layout);
-				});				
-			};
+			}, this)
+			
+			Promise.all(promises).then(function(data) {
+				render(data);
+			});
+			
+			function render(data) {
 
-			function render() {
+				$element.empty();
 
+				var useCustomStyle = layout.gmaps.map.style !== 'default';
 				var hasMeasure = layout.qHyperCube.qMeasureInfo.length >= 1 ? true : false;
 				var hasPopup = layout.qHyperCube.qMeasureInfo.length === 2 ? true : false;
 	
@@ -118,56 +117,57 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 					map.setMapTypeId('map_style');
 	
 				};
-		
+				
 				//Create a marker for each row of data
-				_this.backendApi.eachDataRow(function(rownum, row) {
-					if (row[0].qText == '-') return;
-					//Parse the dimension
-					var latlng = JSON.parse(row[0].qText);
+				data.forEach(function(obj) {
+					obj[0].qMatrix.forEach(function(row, index) {
+						if (row[0].qText == '-') return;
+						
+						//Parse the dimension
+						var latlng = JSON.parse(row[0].qText);
 	
-					//Reverse the order as QS sends long lat
-					var point = new google.maps.LatLng(latlng[1], latlng[0]);
+						//Reverse the order as QS sends long lat
+						var point = new google.maps.LatLng(latlng[1], latlng[0]);
 	
-					//Create our marker - if we have a expression then use that otherwise default to just show locations
-					var marker = new google.maps.Marker({
-						position: point,
-						title: '',
-						customData: hasMeasure ? row[1].qText : 1,
-						qElem: row[0].qElemNumber
+						//Create our marker - if we have a expression then use that otherwise default to just show locations
+						var marker = new google.maps.Marker({
+							position: point,
+							title: '',
+							customData: hasMeasure ? row[1].qText : 1,
+							qElem: row[0].qElemNumber
+						});
+	
+						//If we have popup values for each marker create the popup windows
+						if (hasPopup) {
+		
+							marker.infoWindow = new google.maps.InfoWindow({
+								content: row[2].qText
+							});
+		
+							google.maps.event.addListener(marker, 'mouseover', function() {
+								this.infoWindow.open(map, this);
+							});
+		
+							google.maps.event.addListener(marker, 'mouseout', function() {
+								this.infoWindow.close();
+							});
+		
+						};
+	
+						//Add click handler
+						google.maps.event.addListener(marker, 'click', (function(value) {
+							return function() {
+								_this.selectValues(0, [value], true);
+								highlightMarkers(value)
+							}
+						})(row[0].qElemNumber));
+	
+						bounds.extend(point);
+						markers.push(marker);
+						
 					});
-	
-					//If we have popup values for each marker create the popup windows
-					if (hasPopup) {
-	
-						marker.infoWindow = new google.maps.InfoWindow({
-							content: row[2].qText
-						});
-	
-						google.maps.event.addListener(marker, 'mouseover', function() {
-							this.infoWindow.open(map, this);
-						});
-	
-						google.maps.event.addListener(marker, 'mouseout', function() {
-							this.infoWindow.close();
-						});
-	
-					};
-	
-					//Add click handler
-					//TODO: Give some sort of visual indication that a point is in selected state
-					google.maps.event.addListener(marker, 'click', (function(value) {
-						return function() {
-							_this.selectValues(0, [value], true);
-							highlightMarkers(value)
-						}
-					})(row[0].qElemNumber));
-	
-					bounds.extend(point);
-					markers.push(marker);
-	
 				});
-	
-	
+				
 				//Fit map to bounds
 				map.fitBounds(bounds);
 	
@@ -224,7 +224,7 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 					})
 				};				
 			};
-
+			
 			//In selection mode - loop over markers to highlight markers scheduled for selection.
 			function highlightMarkers(qElem) {
 				var idx = selectedMarkers.indexOf(qElem);
@@ -241,28 +241,7 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', 'async!ht
 					}
 				});
 			};
-
-			//For custom cluster calculations shorten very long numbers
-			//TODO: Move labels into the properties panel
-			function abbreviateNumber(value) {
-				var newValue = value;
-				if (value >= 1000) {
-					var suffixes = ["", "k", "m", "b", "t"];
-					var suffixNum = Math.floor(("" + value).length / 3);
-					var shortValue = '';
-					for (var precision = 2; precision >= 1; precision--) {
-						shortValue = parseFloat((suffixNum != 0 ? (value / Math.pow(1000, suffixNum)) : value).toPrecision(precision));
-						var dotLessShortValue = (shortValue + '').replace(/[^a-zA-Z 0-9]+/g, '');
-						if (dotLessShortValue.length <= 2) {
-							break;
-						}
-					}
-					if (shortValue % 1 != 0) shortNum = shortValue.toFixed(1);
-					newValue = shortValue + suffixes[suffixNum];
-				}
-				return newValue;
-			};
-
-		}
+			
+		}	
 	};
 });
