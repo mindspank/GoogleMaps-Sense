@@ -73,7 +73,6 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 			}, this)
 			
 			Promise.all(promises).then(function(data) {
-				console.log(data)
 				render(data);
 			});
 			
@@ -97,7 +96,7 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 					scaleControl: false,
 					streetViewControl: true,
 					mapTypeControlOptions: {
-						mapTypeIds: [google.maps.MapTypeId.ROADMAP, 'map_style']
+						mapTypeIds: [google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.TERRAIN, google.maps.MapTypeId.HYBRID, 'map_style']
 					}
 				};
 	
