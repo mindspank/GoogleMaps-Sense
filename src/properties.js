@@ -23,7 +23,10 @@ define([], function() {
 				},{
 					value: 'marker',
 					label: 'Marker'
-				}],
+				},{
+                    value: 'boxes',
+                    label: 'Boxes'
+                }],
 				defaultValue: "cluster"
 			},
 			style: {
@@ -56,11 +59,60 @@ define([], function() {
 			}
 		}
 	}
+    
+    var BOX_SETTINGS = {
+      grouped: true,
+      type: 'items',
+      label: 'Box Settings',
+      show: function(d) {
+          return d.gmaps.map.mode === 'boxes'
+      },
+      items: {
+          fillcolor: {
+              type: 'string',
+              label: 'Fill Color',
+              ref: 'gmaps.boxes.fillColor',
+              defaultValue: '#FF0000',
+              expression: 'optional'
+          },
+          fillOpacity: {
+              type: 'number',
+              label: 'Fill Opacity',
+              ref: 'gmaps.boxes.fillOpacity',
+              defaultValue: 0.35,
+              expression: 'optional'              
+          },
+          strokeFill: {
+              type: 'string',
+              label: 'Stroke Fill',
+              ref: 'gmaps.boxes.strokeFill',
+              defaultValue: '#FF0000',
+              expression: 'optional'             
+          },
+          strokeWeight: {
+              type: 'number',
+              label: 'Stroke Weight',
+              ref: 'gmaps.boxes.strokeWeight',
+              defaultValue: 2,
+              expression: 'optional'              
+          },
+          strokeOpacity: {
+              type: 'number',
+              label: 'Stroke Opacity',
+              ref: 'gmaps.boxes.strokeOpacity',
+              defaultValue: 0.8,
+              expression: 'optional'              
+          }               
+      }  
+    };
 
 	var CLUSTER_SETTINGS = {
 		grouped: true,
 		type: 'items',
 		label: 'Cluster Settings',
+        show: function(d) {
+          return d.gmaps.map.mode === 'cluster'
+        },
 		items: {
 			singlecluster: {
 				type: "boolean",
@@ -102,7 +154,8 @@ define([], function() {
 				type: 'items',
 				items: {
 					basemap: BASEMAP_SETTINGS,
-					cluster: CLUSTER_SETTINGS
+					cluster: CLUSTER_SETTINGS,
+                    box: BOX_SETTINGS
 				}
 			}
 		}

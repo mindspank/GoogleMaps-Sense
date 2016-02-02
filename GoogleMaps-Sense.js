@@ -13,6 +13,18 @@ require.config({
 define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/abbreviateNumber', 'qvangular', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, styles, MarkerClusterer, abbreviateNumber, qv) {
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
 
+    if (typeof(Number.prototype.toRad) === "undefined") {
+        Number.prototype.toRad = function() {
+            return this * Math.PI / 180;
+        }
+    }
+
+    if (typeof(Number.prototype.toDeg) === "undefined") {
+        Number.prototype.toDeg = function() {
+            return this * 180 / Math.PI;
+        }
+    }
+
 	return {
 		initialProperties: {
 			version: 1,
@@ -51,6 +63,9 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 
 			var markers = [];
 			var selectedMarkers = [];
+            
+            var rectangles = [];
+            var selectedRects = [];
 																		
 			var columns = layout.qHyperCube.qSize.qcx;
 			var totalheight = layout.qHyperCube.qSize.qcy;
@@ -222,7 +237,42 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 					markers.forEach(function(d) {
 						d.setMap(map);
 					})
-				};				
+				};
+                
+                if (layout.gmaps.map.mode === 'boxes') {
+                    
+                  
+                  markers.forEach(function(d) {
+                      
+                      var distance = d.customData > 1 ? d.customData : 10;
+                      var lat = d.position.lat();
+                      var lng = d.position.lng();
+                      var boxbounds = new google.maps.LatLngBounds(box(lat, lng, 225, distance), box(lat, lng, 45, distance))
+                      var rect = new google.maps.Rectangle({
+                        strokeColor: layout.gmaps.boxes.strokeFill,
+                        strokeOpacity: +layout.gmaps.boxes.strokeOpacity,
+                        strokeWeight: +layout.gmaps.boxes.strokeWeight,
+                        fillColor: layout.gmaps.boxes.fillColor,
+                        fillOpacity: +layout.gmaps.boxes.fillOpacity,
+                        qElem: d.qElem,
+                        map: map,
+                        bounds: boxbounds                         
+                      });
+                      
+                      //Add click handler
+                      google.maps.event.addListener(rect, 'click', (function(value) {
+                          return function() {
+                              _this.selectValues(0, [value], true);
+                              highlightRects(value)
+                          }
+                      })(d.qElem));
+                      
+                      rectangles.push(rect);
+                      
+                  })
+                    
+                };
+                	
 			};
 			
 			//In selection mode - loop over markers to highlight markers scheduled for selection.
@@ -235,12 +285,54 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 				}
 				markers.forEach(function(marker) {
 					if (selectedMarkers.indexOf(marker.qElem) === -1) {
-						marker.setOpacity(0.5)
+    					marker.setOpacity(0.5)
 					} else {
-						marker.setOpacity(1)
+    					marker.setOpacity(1);
 					}
 				});
 			};
+            
+			//In selection mode - loop over markers to highlight markers scheduled for selection.
+			function highlightRects(qElem) {
+				var idx = selectedRects.indexOf(qElem);
+				if (idx > -1) {
+					selectedRects.splice(idx, 1)
+				} else {
+					selectedRects.push(qElem)
+				}
+				rectangles.forEach(function(marker) {
+					if (selectedRects.indexOf(marker.qElem) === -1) {
+                        marker.setOptions({
+                            fillOpacity: +layout.gmaps.boxes.fillOpacity / 2,
+                            strokeOpacity: +layout.gmaps.boxes.strokeOpacity / 2
+                        })                       
+					} else {
+                        marker.setOptions({
+                            fillOpacity: +layout.gmaps.boxes.fillOpacity,
+                            strokeOpacity: +layout.gmaps.boxes.strokeOpacity
+                        })                                 
+					}
+				});
+			};            
+            
+            function box(lat,lng,brng,dist) {
+                this._radius = 6371;
+                var dist = dist / this._radius;
+                var brng = brng.toRad();
+                var lat1 = lat.toRad();
+                var lon1 = lng.toRad();
+                
+                var lat2 = Math.asin(Math.sin(lat1) * Math.cos(dist) +
+                    Math.cos(lat1) * Math.sin(dist) *
+                    Math.cos(brng));
+                    
+                var lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(dist) *
+                    Math.cos(lat1), Math.cos(dist) -
+                    Math.sin(lat1) * Math.sin(lat2));
+                lon2 = (lon2 + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+                
+                return new google.maps.LatLng(lat2.toDeg(),lon2.toDeg());
+            }
 			
 		}	
 	};
