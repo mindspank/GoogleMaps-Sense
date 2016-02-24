@@ -10,7 +10,7 @@ require.config({
 	}
 });
 
-define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/abbreviateNumber', 'qvangular', 'async!https://maps.google.com/maps/api/js?sensor=false'], function(qlik, properties, styles, MarkerClusterer, abbreviateNumber, qv) {
+define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/abbreviateNumber', 'qvangular', 'async!https://maps.google.com/maps/api/js'], function(qlik, properties, styles, MarkerClusterer, abbreviateNumber, qv) {
 	var BASE_URL = '/extensions/GoogleMaps-Sense/';
 
     if (typeof(Number.prototype.toRad) === "undefined") {
