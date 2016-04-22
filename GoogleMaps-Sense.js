@@ -57,15 +57,11 @@ define(['qlik', './src/properties', './src/styles', 'markerclusterer', './src/ab
 			this.backendApi.cacheCube.enabled = false;
 			var _this = this;
 			
-			var columns = layout.qHyperCube.qSize.qcx, totalheight = layout.qHyperCube.qSize.qcy;
-		    var pageheight = Math.floor(10000 / columns);
-			var numberOfPages = Math.ceil(totalheight / pageheight);
-
 			var markers = [];
 			var selectedMarkers = [];
             
-            var rectangles = [];
-            var selectedRects = [];
+            		var rectangles = [];
+            		var selectedRects = [];
 																		
 			var columns = layout.qHyperCube.qSize.qcx;
 			var totalheight = layout.qHyperCube.qSize.qcy;
