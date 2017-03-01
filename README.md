@@ -1,3 +1,7 @@
+# This project is deprecated
+Google has started to enfore API keys which makes internal solutions un-usable.
+If you have a Premier license with Google feel free to use this project as a base.
+
 # GoogleMaps-Sense  
 Plot geo data using Google Maps in Qlik Sense  
 
